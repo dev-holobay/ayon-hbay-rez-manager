@@ -25,7 +25,8 @@ class RezInstaller:
         self.python_version = python_version
         self.graphviz_version = graphviz_version
         self.dependencies = dependencies
-
+        self.log.info("Initializing RezInstaller with settings: %s", self.__dict__)
+        self.python = None
         if os.name == "nt":
             self.root_folder = self.root_folder.replace("/", "\\")
         self.python_folder = os.path.join(self.root_folder, "source", "python")
@@ -84,7 +85,7 @@ class RezInstaller:
                 "-Version",
                 self.python_version,
             ]
-
+            self.log.info(" ".join(cmd))
             subprocess.run(
                 cmd,
                 shell=True,

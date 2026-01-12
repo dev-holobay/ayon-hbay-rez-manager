@@ -1,8 +1,7 @@
 import os
-from ayon_core.lib.applications import LaunchHook
+from ayon_core.hooks.pre_global_host_data import GlobalHostDataHook
 
-
-class SetRezEnv(LaunchHook):
+class SetRezEnv(GlobalHostDataHook):
     """Injects Rez environment variables before DCC launch."""
 
     # Run after default AYON hooks
@@ -10,7 +9,7 @@ class SetRezEnv(LaunchHook):
 
     def execute(self):
         # Access the addon settings
-        rez_settings = self.data.get("addons_settings", {}).get("rez_manager",
+        rez_settings = self.data.get("addons_settings", {}).get("hbay-rez-manager",
                                                                 {})
         rez_path = rez_settings.get("rez_packages_path")
         # "PATH": os.path.join(self.rez_folder, "Scripts", "rez"),
@@ -20,8 +19,7 @@ class SetRezEnv(LaunchHook):
             return
 
         # Inject into the launch environment
-        self.launch_context.env["REZ_PACKAGES_PATH"] = rez_path
-
+        self.launch_context.env.update()
         # Optionally, if you need to add Rez to the PATH for the DCC
         # self.launch_context.env["PATH"] = os.pathsep.join([
         #     "path/to/rez/bin", self.launch_context.env.get("PATH", "")
