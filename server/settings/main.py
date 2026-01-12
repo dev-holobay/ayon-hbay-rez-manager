@@ -13,6 +13,7 @@ ADD_PYTHON_PACKAGES = ["PySide2==6.10.1", "Qt.py==1.4.8"]
 
 GRAPHVIZ_URL = "https://gitlab.com/api/v4/projects/4207231/packages/generic/graphviz-releases/{0}/windows_10_msbuild_Release_graphviz-{0}-win32.zip".format(GRAPHVIZ_VERSION)
 #               https://gitlab.com/api/v4/projects/4207231/packages/generic/graphviz-releases/14.1.1/windows_10_cmake_Release_Graphviz-14.1.1-win64.zip
+                https://gitlab.com/api/v4/projects/4207231/packages/generic/graphviz-releases/14.1.1/windows_10_msbuild_Release_graphviz-14.1.1-win64.zip
 REZ_LATEST_URL = "https://api.github.com/repos/AcademySoftwareFoundation/rez/releases/latest"
 REZ_URL = "https://github.com/AcademySoftwareFoundation/rez/archive/{}.zip".format(REZ_VERSION)
 """
@@ -55,5 +56,5 @@ DEFAULT_VALUES: dict[str, Any] = {
     "rez_version": "3.3.0",
     "rez_packages_path_win": "P:/rez-prod",
     "graphviz_version": "14.1.1",
-    "additional_dependencies_pip": '["PySide2==6.10.1", "Qt.py==1.4.8"]'
+    "additional_dependencies_pip": '["PySide6==6.10.1", "Qt.py==1.4.8"]'
 }

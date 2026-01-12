@@ -30,7 +30,7 @@ class RezInstaller:
             self.root_folder = self.root_folder.replace("/", "\\")
         self.python_folder = os.path.join(self.root_folder, "source", "python")
         self.rez_folder = os.path.join(
-            self.root_folder, "source", "rez", self.rez_version
+            self.root_folder, "source", "rez", f"{self.python_version}-{self.rez_version}"
         )
         self.manifest_path = os.path.join(self.root_folder,
                                           "rez_installed.json")
@@ -104,6 +104,7 @@ class RezInstaller:
                 "python.exe",
             )
             self.log.debug(self.python)
+            self.write_manifest("python_version", self.python_version)
 
     def post_install(self):
         if self.__garbage:
@@ -117,19 +118,43 @@ class RezInstaller:
                     pass
                 else:
                     self.log.info("removed tempfile %s", i)
-        self.write_manifest()
 
-    def write_manifest(self):
-        manifest = {
-            "rez_version": self.rez_version,
-            "python_version": self.python_version,
-            "graphviz_version": self.graphviz_version,
-            "dependencies": self.dependencies,
-        }
+    def write_manifest(self, key: str = None, value: any = None):
+        """Writes or updates the manifest file."""
+        manifest = self.load_manifest() or {}
+        
+        if key and value:
+            manifest[key] = value
+            if key == "python_version":
+                # if the python version changes, we need to update the rez version as well and all after
+                # we need to reinstall graphiz and the dependencies
+                if "rez_version" in manifest:
+                    manifest.pop("rez_version", None)
+                if "graphviz_version" in manifest:
+                    manifest.pop("graphviz_version", None)
+                if "dependencies" in manifest:
+                    manifest.pop("dependencies", None)
+            if key == "rez_version":
+                # we need to reinstall graphiz and the dependencies
+                if "graphviz_version" in manifest:
+                    manifest.pop("graphviz_version", None)
+                if "dependencies" in manifest:
+                    manifest.pop("dependencies", None)
+        else:
+            # Fallback to full write if no specific key provided
+            manifest.update({
+                "rez_version": self.rez_version,
+                "python_version": self.python_version,
+                "graphviz_version": self.graphviz_version,
+                "dependencies": self.dependencies,
+            })
+
         try:
             with open(self.manifest_path, "w") as f:
                 json.dump(manifest, f, indent=4)
-            self.log.info("Manifest written to %s", self.manifest_path)
+            self.log.info("Manifest updated: %s", key if key else "all")
+            # Update local cache so subsequent _should_install checks are accurate
+            self.installed = manifest
         except Exception as e:
             self.log.error("Failed to write manifest: %s", e)
 
@@ -207,6 +232,7 @@ class RezInstaller:
             self.log.exception(e)
         else:
             self.log.info("Successfully installed Rez to %s", self.rez_folder)
+            self.write_manifest("rez_version", self.rez_version)
 
     def get_additional_packages(self):
         if not self._should_install("dependencies", self.dependencies):
@@ -230,6 +256,7 @@ class RezInstaller:
                 self.log.exception(e)
             else:
                 self.log.info("Successfully installed %s", package)
+        self.write_manifest("dependencies", self.dependencies)
 
     def get_graphviz(self):
         if not self._should_install("graphviz_version", self.graphviz_version):
@@ -238,7 +265,7 @@ class RezInstaller:
 
         temp_folder = tempfile.mkdtemp(prefix="graphviz-")
         temp = os.path.join(temp_folder, "graphviz.zip")
-        self.log.info("Downloading Graphviz to temporary path")
+        self.log.info("Downloading Graphviz to temporary path from %s", GRAPHVIZ_URL.format(self.graphviz_version))
         urllib.request.urlretrieve(
             GRAPHVIZ_URL.format(self.graphviz_version), temp
         )
@@ -248,14 +275,15 @@ class RezInstaller:
         self.log.info("Installing Graphviz ...")
         with zipfile.ZipFile(temp, "r") as zip_ref:
             zip_ref.extractall(temp_folder)
-        file_names = os.listdir(os.path.join(temp_folder, "Graphviz", "bin"))
+        file_names = os.listdir(os.path.join(temp_folder, f"Graphviz-{self.graphviz_version}-win64", "bin"))
         for file_name in file_names:
             shutil.move(
-                os.path.join(temp_folder, "Graphviz", "bin", file_name),
+                os.path.join(temp_folder, f"Graphviz-{self.graphviz_version}-win64", "bin", file_name),
                 os.path.join(self.rez_folder, "Scripts", "rez"),
             )
         self.__garbage.append(temp_folder)
         self.log.info("Installed Graphviz")
+        self.write_manifest("graphviz_version", self.graphviz_version)
         return temp
 
 
