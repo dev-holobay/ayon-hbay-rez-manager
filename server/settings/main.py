@@ -51,9 +51,12 @@ class RezManagerSettings(BaseSettingsModel):
 
 
 DEFAULT_VALUES: dict[str, Any] = {
-    "rez_python_version": "3.13.11",
-    "rez_version": "3.3.0",
-    "graphviz_version": "14.1.1",
-    "additional_dependencies_pip": '["PySide6==6.10.1", "Qt.py==1.4.8"]',
-    "rez_packages_path_win": "P:/pipe/rez/p-ext;P:/pipe/rez/p-int",
+    "rez_install_options": {
+        "rez_python_version": "3.13.11",
+        "rez_version": "3.3.0",
+        "graphviz_version": "14.1.1",
+        "additional_dependencies_pip": '["PySide6==6.10.1", "Qt.py==1.4.8"]', },
+
+    "rez_config_options": {
+        "rez_packages_path_win": "P:/pipe/rez/p-ext;P:/pipe/rez/p-int", },
 }

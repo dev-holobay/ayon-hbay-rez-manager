@@ -14,7 +14,8 @@ class RezManagerAddon(AYONAddon, ITrayAddon):
 
     def initialize(self, settings):
         self.rez_settings = settings.get(self.name, {})
-        self.log.debug(f"Initialized with settings: {self.rez_settings}")
+        self.rez_install_settings = self.rez_settings.get("rez_install_options", {})
+        self.log.info(f"Initialized with settings: {self.rez_settings}")
         self.studio_code = settings.get("core", {}).get("studio_code",
                                                         "ayon-rez")
         self.log.debug(f"Studio code: {self.studio_code}")
@@ -34,13 +35,13 @@ class RezManagerAddon(AYONAddon, ITrayAddon):
 
         # Check if Rez is installed, if not, install it
         installer = rez_installer.RezInstaller(path,
-                                               self.rez_settings.get(
+                                               self.rez_install_settings.get(
                                                    "rez_version"),
-                                               self.rez_settings.get(
+                                               self.rez_install_settings.get(
                                                    "rez_python_version"),
-                                               self.rez_settings.get(
+                                               self.rez_install_settings.get(
                                                    "graphviz_version"),
-                                               json.loads(self.rez_settings.get(
+                                               json.loads(self.rez_install_settings.get(
                                                    "additional_dependencies_pip")),
                                                logger=self.log)
         if not installer.check_if_installed():
