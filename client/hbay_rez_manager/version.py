@@ -1,2 +1,2 @@
-"""Package declaring AYON addon 'hbay-rez-manager' version."""
+"""Package declaring AYON addon 'hbay_rez_manager' version."""
 __version__ = "0.1.0"

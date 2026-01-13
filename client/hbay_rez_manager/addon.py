@@ -9,7 +9,7 @@ ADDON_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
 class RezManagerAddon(AYONAddon, ITrayAddon):
-    name = "hbay-rez-manager"
+    name = "hbay_rez_manager"
     version = __version__
 
     def initialize(self, settings):

@@ -10,8 +10,8 @@ class SetRezEnv(PreLaunchHook):
     def execute(self):
         # Access the addon settings
         self.log.info("Setting Rez Environment Variables")
-        self.log.info(self.launch_context.data.get("project_settings").get("hbay-rez-manager"))
-        rez_settings = self.launch_context.data.get("project_settings", {}).get("hbay-rez-manager", {})
+        self.log.info(self.launch_context.data.get("project_settings").get("hbay_rez_manager"))
+        rez_settings = self.launch_context.data.get("project_settings", {}).get("hbay_rez_manager", {})
         rez_path = rez_settings.get("rez_packages_path_win")
         if not rez_path:
             self.log.warning("REZ_PACKAGES_PATH is not set in AYON settings.")
