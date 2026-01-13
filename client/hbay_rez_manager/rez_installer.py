@@ -310,28 +310,3 @@ class RezInstaller:
         self.log.info("Installed Graphviz")
         self.write_manifest("graphviz_version", self.graphviz_version)
         return temp
-
-
-if __name__ == "__main__":
-    from platformdirs import user_data_dir
-    from settings.main import DEFAULT_VALUES
-
-    logging.basicConfig(level=logging.INFO)
-    path = user_data_dir(appname="rez", appauthor="holobay")
-
-    # additional_dependencies_pip is a string representation of a list in DEFAULT_VALUES
-    dependencies = DEFAULT_VALUES["additional_dependencies_pip"]
-    if isinstance(dependencies, str):
-        try:
-            dependencies = json.loads(dependencies)
-        except json.JSONDecodeError:
-            dependencies = []
-
-    installer = RezInstaller(
-        root=path,
-        rez_version=DEFAULT_VALUES["rez_version"],
-        python_version=DEFAULT_VALUES["rez_python_version"],
-        graphviz_version=DEFAULT_VALUES["graphviz_version"],
-        dependencies=dependencies
-    )
-    installer.install_rez()
