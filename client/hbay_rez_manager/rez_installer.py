@@ -18,8 +18,9 @@ class RezInstaller:
             python_version: str,
             graphviz_version: str,
             dependencies: list,
+            logger: logging.Logger = None,
     ):
-        self.log = logging.getLogger(self.__class__.__name__)
+        self.log = logger or logging.getLogger(self.__class__.__name__)
         self.root_folder = root
         self.rez_version = rez_version
         self.python_version = python_version
@@ -39,7 +40,7 @@ class RezInstaller:
         self.manifest_path = os.path.join(self.root_folder,
                                           "rez_installed.json")
         self.installed = self.load_manifest()
-
+        self.rez_path_folder = os.path.join(self.rez_folder, "Scripts", "rez")
         for i in [self.rez_folder, self.python_folder]:
             if not os.path.isdir(i):
                 try:
@@ -137,21 +138,6 @@ class RezInstaller:
 
         if key and value:
             manifest[key] = value
-            if key == "python_version":
-                # if the python version changes, we need to update the rez version as well and all after
-                # we need to reinstall graphiz and the dependencies
-                if "rez_version" in manifest:
-                    manifest.pop("rez_version", None)
-                if "graphviz_version" in manifest:
-                    manifest.pop("graphviz_version", None)
-                if "dependencies" in manifest:
-                    manifest.pop("dependencies", None)
-            if key == "rez_version":
-                # we need to reinstall graphiz and the dependencies
-                if "graphviz_version" in manifest:
-                    manifest.pop("graphviz_version", None)
-                if "dependencies" in manifest:
-                    manifest.pop("dependencies", None)
         else:
             # Fallback to full write if no specific key provided
             manifest.update({
@@ -201,6 +187,7 @@ class RezInstaller:
 
         if self.installed is None:
             return False
+        self.log.debug("Checking if requested configuration matches installed manifest.")
         return (
                 self.installed.get("rez_version") == self.rez_version and
                 self.installed.get("python_version") == self.python_version and
