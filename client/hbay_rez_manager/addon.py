@@ -15,7 +15,7 @@ class RezManagerAddon(AYONAddon, ITrayAddon):
     def initialize(self, settings):
         self.rez_settings = settings.get(self.name, {})
         self.rez_install_settings = self.rez_settings.get("rez_install_options", {})
-        self.log.info(f"Initialized with settings: {self.rez_settings}")
+        self.log.debug(f"Initialized with settings: {self.rez_settings}")
         self.studio_code = settings.get("core", {}).get("studio_code",
                                                         "ayon-rez")
         self.log.debug(f"Studio code: {self.studio_code}")
