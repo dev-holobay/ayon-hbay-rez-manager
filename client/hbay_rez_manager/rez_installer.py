@@ -25,14 +25,17 @@ class RezInstaller:
         self.python_version = python_version
         self.graphviz_version = graphviz_version
         self.dependencies = dependencies
-        self.log.info("Initializing RezInstaller with settings: %s", self.__dict__)
+        self.log.info("Initializing RezInstaller with settings: %s",
+                      self.__dict__)
         self.python = None
         if os.name == "nt":
             self.root_folder = self.root_folder.replace("/", "\\")
         self.python_folder = os.path.join(self.root_folder, "source", "python")
         self.rez_folder = os.path.join(
-            self.root_folder, "source", "rez", f"{self.python_version}-{self.rez_version}"
+            self.root_folder, "source", "rez",
+            f"{self.python_version}-{self.rez_version}"
         )
+        self.bundle_version = f"{self.python_version}-{self.rez_version}"
         self.manifest_path = os.path.join(self.root_folder,
                                           "rez_installed.json")
         self.installed = self.load_manifest()
@@ -49,21 +52,29 @@ class RezInstaller:
         """Internal check to see if a specific component needs installation."""
         if not self.installed:
             return True
-        
+
         if key == "dependencies":
             return set(self.installed.get(key, [])) != set(requested_value)
-        
+
         return self.installed.get(key) != requested_value
 
     def get_python(self):
-        if not self._should_install("python_version", self.python_version):
-            self.log.info("Python %s already installed, skipping.", self.python_version)
-            self.python = os.path.join(
-                self.python_folder,
-                f"python.{self.python_version}",
-                "tools",
-                "python.exe",
-            )
+        python_exe = os.path.join(
+            self.python_folder,
+            f"python.{self.python_version}",
+            "tools",
+            "python.exe",
+        )
+        if not self._should_install("python_version",
+                                    self.python_version) or os.path.exists(
+                python_exe):
+            self.log.info(
+                "Python %s already found on disk or manifest, skipping installation.",
+                self.python_version)
+            self.python = python_exe
+            # Ensure the current manifest entry is updated if it was missing
+            if self.installed.get("python_version") != self.python_version:
+                self.write_manifest("python_version", self.python_version)
             return
 
         temp_folder = tempfile.mkdtemp(prefix="python-")
@@ -123,7 +134,7 @@ class RezInstaller:
     def write_manifest(self, key: str = None, value: any = None):
         """Writes or updates the manifest file."""
         manifest = self.load_manifest() or {}
-        
+
         if key and value:
             manifest[key] = value
             if key == "python_version":
@@ -151,11 +162,26 @@ class RezInstaller:
             })
 
         try:
+            # Load the full file content first, not just the bundle-specific part
+            full_manifest_data = {}
+            if os.path.exists(self.manifest_path):
+                with open(self.manifest_path, "r") as f:
+                    try:
+                        full_manifest_data = json.load(f)
+                    except json.JSONDecodeError:
+                        full_manifest_data = {}
+
+            # Update ONLY the current bundle's entry within the full data
+            full_manifest_data[self.bundle_version] = manifest
+
             with open(self.manifest_path, "w") as f:
-                json.dump(manifest, f, indent=4)
-            self.log.info("Manifest updated: %s", key if key else "all")
-            # Update local cache so subsequent _should_install checks are accurate
+                json.dump(full_manifest_data, f, indent=4)
+
+            self.log.info("Manifest updated for %s: %s", self.bundle_version,
+                          key if key else "all")
+            # Update local cache
             self.installed = manifest
+
         except Exception as e:
             self.log.error("Failed to write manifest: %s", e)
 
@@ -164,7 +190,8 @@ class RezInstaller:
             return None
         try:
             with open(self.manifest_path, "r") as f:
-                return json.load(f)
+                data = json.load(f)
+                return data.get(self.bundle_version, {})
         except Exception as e:
             self.log.error("Failed to load manifest: %s", e)
             return None
@@ -177,8 +204,10 @@ class RezInstaller:
         return (
                 self.installed.get("rez_version") == self.rez_version and
                 self.installed.get("python_version") == self.python_version and
-                self.installed.get("graphviz_version") == self.graphviz_version and
-                set(self.installed.get("dependencies", [])) == set(self.dependencies)
+                self.installed.get(
+                    "graphviz_version") == self.graphviz_version and
+                set(self.installed.get("dependencies", [])) == set(
+            self.dependencies)
         )
 
     def install_rez(self):
@@ -192,7 +221,9 @@ class RezInstaller:
 
     def get_rez(self):
         if not self._should_install("rez_version", self.rez_version):
-            self.log.info("Rez %s already downloaded/installed, skipping download.", self.rez_version)
+            self.log.info(
+                "Rez %s already downloaded/installed, skipping download.",
+                self.rez_version)
             return None
 
         temp_folder = tempfile.mkdtemp(prefix="python-")
@@ -261,12 +292,14 @@ class RezInstaller:
 
     def get_graphviz(self):
         if not self._should_install("graphviz_version", self.graphviz_version):
-            self.log.info("Graphviz %s already installed, skipping.", self.graphviz_version)
+            self.log.info("Graphviz %s already installed, skipping.",
+                          self.graphviz_version)
             return None
 
         temp_folder = tempfile.mkdtemp(prefix="graphviz-")
         temp = os.path.join(temp_folder, "graphviz.zip")
-        self.log.info("Downloading Graphviz to temporary path from %s", GRAPHVIZ_URL.format(self.graphviz_version))
+        self.log.info("Downloading Graphviz to temporary path from %s",
+                      GRAPHVIZ_URL.format(self.graphviz_version))
         urllib.request.urlretrieve(
             GRAPHVIZ_URL.format(self.graphviz_version), temp
         )
@@ -276,10 +309,14 @@ class RezInstaller:
         self.log.info("Installing Graphviz ...")
         with zipfile.ZipFile(temp, "r") as zip_ref:
             zip_ref.extractall(temp_folder)
-        file_names = os.listdir(os.path.join(temp_folder, f"Graphviz-{self.graphviz_version}-win64", "bin"))
+        file_names = os.listdir(
+            os.path.join(temp_folder, f"Graphviz-{self.graphviz_version}-win64",
+                         "bin"))
         for file_name in file_names:
             shutil.move(
-                os.path.join(temp_folder, f"Graphviz-{self.graphviz_version}-win64", "bin", file_name),
+                os.path.join(temp_folder,
+                             f"Graphviz-{self.graphviz_version}-win64", "bin",
+                             file_name),
                 os.path.join(self.rez_folder, "Scripts", "rez"),
             )
         self.__garbage.append(temp_folder)

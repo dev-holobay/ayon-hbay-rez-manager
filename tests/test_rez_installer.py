@@ -7,8 +7,8 @@ from typing import Any
 
 DEFAULT_VALUES: dict[str, Any] = {
     "rez_python_version": "3.13.11",
-    "rez_version": "3.2.0",
-    "rez_packages_path_win": "P:/rez-prod",
+    "rez_version": "3.3.0",
+    "rez_packages_path_win": "P:/pipe/rez/p-ext;P:/pipe/rez/p-int",
     "graphviz_version": "14.1.1",
     "additional_dependencies_pip": '["PySide6==6.10.1", "Qt.py==1.4.8"]'
 }
