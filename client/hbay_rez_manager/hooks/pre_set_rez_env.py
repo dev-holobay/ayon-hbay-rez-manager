@@ -5,7 +5,7 @@ import json
 from ayon_applications import PreLaunchHook, ApplicationLaunchFailed, \
     LaunchTypes
 
-from ayon_core.lib import vendor_bin_utils
+from ayon_core.lib.vendor_bin_utils import find_executable
 from ayon_applications.defs import ApplicationExecutable
 
 
@@ -98,7 +98,7 @@ class PreLaunchSetRezEnv(PreLaunchHook):
             self.log.info(f"{k}={v}")
 
         # patch the executable in launch_context so later executed prelaunch hooks continue to function
-        executable = vendor_bin_utils.find_executable(
+        executable = find_executable(
             str(self.launch_context.executable),
             env=self.launch_context.env)
         self.launch_context.executable = ApplicationExecutable(executable)
