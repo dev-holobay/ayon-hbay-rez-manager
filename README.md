@@ -34,6 +34,9 @@ The prelaunch hook pre_set_rez_config propagates the rez_config_options.
 - REZ_PACKAGES_PATH
 - more to come
 
+![config example](images/config_example.jpg)
+
+
 The prelaunch hook pre_set_rez_env merges the rez env that is based of AYON_REZ_PACKAGES defined in the application settings environment.
 Thanks to [BigRoy](https://github.com/BigRoy) for the hook that really helped a ton.
 
