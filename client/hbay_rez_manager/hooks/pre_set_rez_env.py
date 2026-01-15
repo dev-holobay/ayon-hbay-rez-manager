@@ -100,6 +100,5 @@ class PreLaunchSetRezEnv(PreLaunchHook):
         # patch the executable in launch_context so later executed prelaunch hooks continue to function
         executable = vendor_bin_utils.find_executable(
             str(self.launch_context.executable),
-            optional_paths=self.launch_context.env.get("PATH").split(
-                os.pathsep))
+            env=self.launch_context.env)
         self.launch_context.executable = ApplicationExecutable(executable)
