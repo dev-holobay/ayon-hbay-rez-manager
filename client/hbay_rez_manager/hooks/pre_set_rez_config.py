@@ -1,3 +1,5 @@
+import platform
+
 from ayon_applications import PreLaunchHook, LaunchTypes, manager
 
 
@@ -15,7 +17,7 @@ class PreLaunchSetRezConfig(PreLaunchHook):
             "hbay_rez_manager"))
         rez_settings = self.launch_context.data.get("project_settings", {}).get(
             "hbay_rez_manager", {}).get("rez_config_options", {})
-        rez_path = rez_settings.get("rez_packages_path_win")
+        rez_path = rez_settings.get("rez_packages_path").get(platform.system().lower())
         if not rez_path:
             self.log.warning("REZ_PACKAGES_PATH is not set in AYON settings.")
             return

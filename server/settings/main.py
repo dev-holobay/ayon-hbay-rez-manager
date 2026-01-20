@@ -1,8 +1,12 @@
 """Settings for the addon."""
 from typing import Any
-
+from pydantic import Field
 from ayon_server.settings import BaseSettingsModel, SettingsField
 
+class MultiplatformPath(BaseSettingsModel):
+    windows: str = Field("", title="Windows")
+    linux: str = Field("", title="Linux")
+    darwin: str = Field("", title="MacOS")
 
 class RezInstallOptions(BaseSettingsModel):
     rez_python_version: str = SettingsField(
@@ -31,10 +35,11 @@ class RezInstallOptions(BaseSettingsModel):
 
 
 class RezConfigOptions(BaseSettingsModel):
-    rez_packages_path_win: str = SettingsField(
+    rez_packages_path: str = SettingsField(
+        default_factory=MultiplatformPath,
         title="Rez Packages Path Win",
+        scope=["studio", "project", "site"],
         description="Root directory where Rez packages are stored",
-        default_factory=str,
     )
 
 
@@ -58,5 +63,5 @@ DEFAULT_VALUES: dict[str, Any] = {
         "additional_dependencies_pip": '["PySide6==6.10.1", "Qt.py==1.4.8"]', },
 
     "rez_config_options": {
-        "rez_packages_path_win": "P:/pipe/rez/p-ext;P:/pipe/rez/p-int", },
+        "rez_packages_path":{"windows": "P:/pipe/rez/p-ext;P:/pipe/rez/p-int"}},
 }
