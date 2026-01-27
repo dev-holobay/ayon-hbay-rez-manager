@@ -6,7 +6,7 @@ from ayon_applications import PreLaunchHook, LaunchTypes, manager
 class PreLaunchSetRezConfig(PreLaunchHook):
     """Injects Rez config environment variables before DCC launch."""
 
-    order = -100  # this hook needs to execute first as it sets the rez config environment variables
+    order = -101  # this hook needs to execute first as it sets the rez config environment variables
     platforms = {"windows"}
     launch_types = {LaunchTypes.local}
 
