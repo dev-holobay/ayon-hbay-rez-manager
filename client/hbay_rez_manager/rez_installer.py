@@ -48,16 +48,7 @@ class RezInstaller:
                 except WindowsError:
                     pass
         self.__garbage = []
-
-    def _should_install(self, key: str, requested_value: any) -> bool:
-        """Internal check to see if a specific component needs installation."""
-        if not self.installed:
-            return True
-
-        if key == "dependencies":
-            return set(self.installed.get(key, [])) != set(requested_value)
-
-        return self.installed.get(key) != requested_value
+        self.progress_callback = None
 
     def get_python(self):
         python_exe = os.path.join(
@@ -68,7 +59,7 @@ class RezInstaller:
         )
         if not self._should_install("python_version",
                                     self.python_version) or os.path.exists(
-                python_exe):
+            python_exe):
             self.log.info(
                 "Python %s already found on disk or manifest, skipping installation.",
                 self.python_version)
@@ -187,7 +178,8 @@ class RezInstaller:
 
         if self.installed is None:
             return False
-        self.log.debug("Checking if requested configuration matches installed manifest.")
+        self.log.debug(
+            "Checking if requested configuration matches installed manifest.")
         return (
                 self.installed.get("rez_version") == self.rez_version and
                 self.installed.get("python_version") == self.python_version and
@@ -197,14 +189,34 @@ class RezInstaller:
             self.dependencies)
         )
 
-    def install_rez(self):
+    def run(self):
         self.errors = []
+        if self.progress_callback:
+            self.progress_callback(0, "Getting Python")
         self.get_python()
+
+        if self.progress_callback:
+            self.progress_callback(20, "Getting Rez")
         rez_zip = self.get_rez()
+
+        if self.progress_callback:
+            self.progress_callback(40, "Installing Rez")
         self.setup_rez(rez_zip)
+
+        if self.progress_callback:
+            self.progress_callback(60, "Getting Additional Dependencies")
         self.get_additional_packages()
+
+        if self.progress_callback:
+            self.progress_callback(80, "Getting Graphviz")
         self.get_graphviz()
+
+        if self.progress_callback:
+            self.progress_callback(90, "Cleanup")
         self.post_install()
+
+        if self.progress_callback:
+            self.progress_callback(100, "Done")
 
     def get_rez(self):
         if not self._should_install("rez_version", self.rez_version):
@@ -310,3 +322,13 @@ class RezInstaller:
         self.log.info("Installed Graphviz")
         self.write_manifest("graphviz_version", self.graphviz_version)
         return temp
+
+    def _should_install(self, key: str, requested_value: any) -> bool:
+        """Internal check to see if a specific component needs installation."""
+        if not self.installed:
+            return True
+
+        if key == "dependencies":
+            return set(self.installed.get(key, [])) != set(requested_value)
+
+        return self.installed.get(key) != requested_value
