@@ -23,7 +23,7 @@ class PreLaunchSetRezEnv(PreLaunchHook):
     Note that the rez resolved environment will be resolved with all parent
     variables enabled and will merge into the launch context environment.
     """
-    order = -99
+    order = -98
     platforms = {"windows"}
     launch_types = {LaunchTypes.local}
 
