@@ -85,6 +85,12 @@ class PreLaunchSetRezEnv(PreLaunchHook):
         # Update self.launch_context.env with the rez environment
         rez_env: dict[str, str] = json.loads(result.stdout)
 
+        # Sanitize rez_env: strip leading path separator from values
+        # Rez might prepend pathsep to variables if they were empty
+        for key, value in rez_env.items():
+            if isinstance(value, str) and value.startswith(os.pathsep):
+                rez_env[key] = value.lstrip(os.pathsep)
+
         self.launch_context.env.update(rez_env)
 
         # filter paths for duplicates
