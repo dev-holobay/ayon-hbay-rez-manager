@@ -23,15 +23,15 @@ class PreLaunchSetRezEnv(PreLaunchHook):
     Note that the rez resolved environment will be resolved with all parent
     variables enabled and will merge into the launch context environment.
     """
-    order = -98
-    platforms = {"windows"}
+    order = -98  # leave some space to egg bootstrap
+    # the path to rez itself in a hook
     launch_types = {LaunchTypes.local}
 
     def execute(self):
         ayon_rez_packages = self.launch_context.env.get("AYON_REZ_PACKAGES")
-        self.log.info(f"AYON_REZ_PACKAGES: {ayon_rez_packages}")
         if not ayon_rez_packages:
             return
+        self.log.info(f"AYON_REZ_PACKAGES: {ayon_rez_packages}")
 
         packages: list[str] = ayon_rez_packages.split(os.pathsep)
         python_cmd = (
@@ -64,6 +64,7 @@ class PreLaunchSetRezEnv(PreLaunchHook):
             command,
             env=tmp_env,
             capture_output=True,
+            creationflags=subprocess.CREATE_NO_WINDOW,
         )
         if result.returncode != 0:
             output = ""
@@ -101,7 +102,7 @@ class PreLaunchSetRezEnv(PreLaunchHook):
 
         for k in sorted(self.launch_context.env.keys()):
             v = self.launch_context.env[k]
-            self.log.info(f"{k}={v}")
+            self.log.debug(f"{k}={v}")
 
         # patch the executable in launch_context so later executed prelaunch hooks continue to function
         executable = find_executable(
