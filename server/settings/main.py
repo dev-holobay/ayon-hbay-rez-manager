@@ -37,7 +37,7 @@ class RezInstallOptions(BaseSettingsModel):
 class RezConfigOptions(BaseSettingsModel):
     rez_packages_path: MultiplatformPath = SettingsField(
         default_factory=MultiplatformPath,
-        title="Rez Packages Path Win",
+        title="Rez Packages Path",
         scope=["studio", "project", "site"],
         description="Root directory where Rez packages are stored",
     )
