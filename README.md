@@ -47,7 +47,6 @@ Thanks to [BigRoy](https://github.com/BigRoy) for the hook that really helped a 
 
 - add support for other platforms
 - add option to set env var into PATH for the current user, in windows settings
-- add progress bar for rez install and updates
 - add support for all rez_config options
 - add ui in tray to rezify python from nuget
 - add ui in tray to manage pip installations for the existing python variants
