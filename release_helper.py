@@ -36,12 +36,6 @@ except ModuleNotFoundError:
     print("ERROR: ayon-python-api not installed. Run: pip install ayon-python-api")
     sys.exit(1)
 
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ModuleNotFoundError:
-    logging.warning("dotenv not installed, relying on environment variables")
-
 
 def setup_logging(debug=False):
     """Setup logging configuration."""
@@ -181,6 +175,11 @@ def main():
         action="store_true",
         help="Skip upload to server (for testing)"
     )
+    parser.add_argument(
+        "--dev-upload",
+        action="store_true",
+        help="Upload to server but do not bump version, commit and push on the git side."
+    )
 
     args = parser.parse_args()
     log = setup_logging(args.debug)
@@ -196,65 +195,67 @@ def main():
         log.error(f"Failed to read current version: {e}")
         return 1
 
-    # Calculate new version
-    new_version = bump_version(current_version, args.bump)
-    log.info(f"New version: {new_version} ({args.bump} bump)")
+    new_version = current_version
+    if not args.dev_upload:
+        # Calculate new version
+        new_version = bump_version(current_version, args.bump)
+        log.info(f"New version: {new_version} ({args.bump} bump)")
 
-    # Confirm with user
-    response = input(f"\nBump version {current_version} → {new_version}? [y/N]: ")
-    if response.lower() != 'y':
-        log.info("Aborted by user")
-        return 0
+        # Confirm with user
+        response = input(f"\nBump version {current_version} → {new_version}? [y/N]: ")
+        if response.lower() != 'y':
+            log.info("Aborted by user")
+            return 0
 
-    # Update version in all files
-    log.info("\n=== Updating version files ===")
-    files_to_update = [
-        repo_root / "package.py",
-        repo_root / "pyproject.toml",
-    ]
+        # Update version in all files
+        log.info("\n=== Updating version files ===")
+        files_to_update = [
+            repo_root / "package.py",
+            repo_root / "pyproject.toml",
+        ]
 
-    # Find and add client version.py
-    client_version = find_client_version_py(repo_root, addon_name)
-    if client_version:
-        files_to_update.append(client_version)
+        # Find and add client version.py
+        client_version = find_client_version_py(repo_root, addon_name)
+        if client_version:
+            files_to_update.append(client_version)
 
-    updated_files = []
-    for file_path in files_to_update:
-        if update_file_version(file_path, current_version, new_version, log):
-            updated_files.append(file_path)
+        updated_files = []
+        for file_path in files_to_update:
+            if update_file_version(file_path, current_version, new_version, log):
+                updated_files.append(file_path)
 
-    if not updated_files:
-        log.error("No files were updated!")
-        return 1
+        if not updated_files:
+            log.error("No files were updated!")
+            return 1
 
-    # Git operations
-    log.info("\n=== Git operations ===")
-    try:
-        # Add files
-        for file_path in updated_files:
-            run_command(["git", "add", str(file_path)], log)
+        # Git operations
+        log.info("\n=== Git operations ===")
+        try:
+            # Add files
+            for file_path in updated_files:
+                run_command(["git", "add", str(file_path)], log)
 
-        # Commit
-        commit_msg = f"Bump version to {new_version}"
-        run_command(["git", "commit", "-m", commit_msg], log)
-        log.info(f"✓ Committed: {commit_msg}")
+            # Commit
+            commit_msg = f"Bump version to {new_version}"
+            run_command(["git", "commit", "-m", commit_msg], log)
+            log.info(f"✓ Committed: {commit_msg}")
 
-        # Tag
-        tag_name = f"v{new_version}"
-        run_command(["git", "tag", "-a", tag_name, "-m", f"Version {new_version}"], log)
-        log.info(f"✓ Tagged: {tag_name}")
+            # Tag
+            tag_name = f"v{new_version}"
+            run_command(["git", "tag", "-a", tag_name, "-m", f"Version {new_version}"], log)
+            log.info(f"✓ Tagged: {tag_name}")
 
-        # Push
-        if not args.skip_push:
-            run_command(["git", "push"], log)
-            run_command(["git", "push", "--tags"], log)
-            log.info("✓ Pushed to remote")
-        else:
-            log.info("⊘ Skipped push (--skip-push)")
+            # Push
+            if not args.skip_push:
+                run_command(["git", "push"], log)
+                run_command(["git", "push", "--tags"], log)
+                log.info("✓ Pushed to remote")
+            else:
+                log.info("⊘ Skipped push (--skip-push)")
 
-    except subprocess.CalledProcessError as e:
-        log.error(f"Git operation failed: {e}")
-        return 1
+        except subprocess.CalledProcessError as e:
+            log.error(f"Git operation failed: {e}")
+            return 1
 
     # Create package
     log.info("\n=== Creating package ===")
