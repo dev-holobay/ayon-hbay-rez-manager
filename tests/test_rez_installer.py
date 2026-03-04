@@ -1,5 +1,7 @@
 import json
 import logging
+from pathlib import Path
+
 import pytest
 from platformdirs import user_data_dir
 from hbay_rez_manager.rez_installer import RezInstaller
@@ -18,8 +20,8 @@ DEFAULT_VALUES: dict[str, Any] = {
 def test_rez_installation():
     """Test the full Rez installation process using default settings."""
     logging.basicConfig(level=logging.INFO)
-    path = user_data_dir(appname="rez", appauthor="holobay")
-
+    # path = user_data_dir(appname="rez", appauthor="holobay")
+    path = Path.home() / ".rez"
     # Parse dependencies from default settings
     dependencies = DEFAULT_VALUES["additional_dependencies_pip"]
     if isinstance(dependencies, str):
@@ -37,7 +39,7 @@ def test_rez_installation():
     )
 
     # We run the installer. If it crashes, the test fails.
-    installer.install_rez()
+    installer.run()
 
     # Basic assertions to ensure manifest was created
     assert installer.check_if_installed() is True
