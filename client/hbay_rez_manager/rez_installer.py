@@ -1,29 +1,33 @@
+from __future__ import annotations
 import json
 import logging
 import os
-from pathlib import Path
 import platform
 import re
 import shutil
 import subprocess
 import tarfile
 import tempfile
-import zipfile
 import urllib
 import urllib.request
+import zipfile
+from pathlib import Path
+
+import zstandard as zstd
 
 from .constants import GRAPHVIZ_URL, REZ_URL
 
 
 class RezInstaller:
+    """RezInstaller class for managing Rez package install + dependencies."""
     def __init__(
-            self,
-            root: str,
-            rez_version: str,
-            python_version: str,
-            graphviz_version: str,
-            dependencies: list,
-            logger: logging.Logger = None,
+        self,
+        root: str,
+        rez_version: str,
+        python_version: str,
+        graphviz_version: str,
+        dependencies: list,
+        logger: logging.Logger = None,
     ):
         self.log = logger or logging.getLogger(self.__class__.__name__)
         self.root_folder = root
@@ -38,12 +42,15 @@ class RezInstaller:
         self.root_folder = os.path.normpath(self.root_folder)
         self.python_folder = os.path.join(self.root_folder, "source", "python")
         self.rez_folder = os.path.join(
-            self.root_folder, "source", "rez",
-            f"{self.python_version}-{self.rez_version}"
+            self.root_folder,
+            "source",
+            "rez",
+            f"{self.python_version}-{self.rez_version}",
         )
         self.bundle_version = f"{self.python_version}-{self.rez_version}"
-        self.manifest_path = os.path.join(self.root_folder,
-                                          "rez_installed.json")
+        self.manifest_path = os.path.join(
+            self.root_folder, "rez_installed.json"
+        )
         self.installed = self.load_manifest()
         # Use platform-appropriate bin directory
         system = platform.system().lower()
@@ -58,93 +65,8 @@ class RezInstaller:
         self.__garbage = []
         self.progress_callback = None
 
-    def _get_platform_target(self):
-        """Get the python-build-standalone platform target string."""
-        system = platform.system().lower()
-        machine = platform.machine().lower()
-
-        # Normalize arch
-        arch_map = {
-            "amd64": "x86_64",
-            "x86_64": "x86_64",
-            "arm64": "aarch64",
-            "aarch64": "aarch64",
-        }
-        arch = arch_map.get(machine, machine)
-
-        # python-build-standalone naming convention
-        platform_map = {
-            ("windows", "x86_64"): "x86_64-pc-windows-msvc",
-            ("linux", "x86_64"): "x86_64-unknown-linux-gnu",
-            ("linux", "aarch64"): "aarch64-unknown-linux-gnu",
-            ("darwin", "x86_64"): "x86_64-apple-darwin",
-            ("darwin", "aarch64"): "aarch64-apple-darwin",
-        }
-
-        target = platform_map.get((system, arch))
-        if not target:
-            raise RuntimeError(f"Unsupported platform: {system} {arch}")
-        return target
-
-    def _github_json(self, url: str) -> dict:
-        """Fetch JSON from GitHub API (no auth)."""
-        req = urllib.request.Request(
-            url,
-            headers={
-                "Accept": "application/vnd.github+json",
-                "User-Agent": "hbay-rez-manager",
-            },
-        )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-
-    def _resolve_python_build_standalone_url(self, python_version: str,
-                                             target: str) -> str:
-        """
-        Resolve a python-build-standalone asset URL dynamically.
-
-        We search GitHub releases and pick the first asset matching:
-          cpython-<version>+<tag>-<target>-install_only.tar.gz
-        """
-        wanted = re.compile(
-            rf"^cpython-{re.escape(python_version)}\+\d{{8}}-{re.escape(target)}-(pgo\+lto-full|pgo-full)\.tar\.(gz|zst)$"
-        )
-        self.log.info(f"{wanted}")
-        "cpython-3.12.12+20251202-x86_64-pc-windows-msvc-pgo-full.tar.zst"
-        # GitHub API: list releases (newest first)
-        releases = self._github_json(
-            "https://api.github.com/repos/astral-sh/python-build-standalone/releases?per_page=20"
-        )
-        for rel in releases:
-            for asset in rel.get("assets", []):
-                name = asset.get("name", "")
-                self.log.debug(f"Checking asset: {name}")
-                if wanted.match(name):
-                    url = asset.get("browser_download_url")
-                    if url:
-                        return url
-
-        raise RuntimeError(
-            f"Could not find python-build-standalone asset for "
-            f"python={python_version}, target={target}. "
-            f"The requested version may not be published for this platform yet."
-        )
-
-    def extract_archive(self, archive_path: Path, dest: Path) -> None:
-        if archive_path.suffix == ".zst" or archive_path.name.endswith(
-                ".tar.zst"):
-            # requires zstandard: pip install zstandard
-            import zstandard as zstd
-            with open(archive_path, "rb") as fh:
-                dctx = zstd.ZstdDecompressor()
-                with dctx.stream_reader(fh) as reader:
-                    with tarfile.open(fileobj=reader, mode="r|") as tar:
-                        tar.extractall(dest)
-        else:
-            with tarfile.open(archive_path, "r:gz") as tar:
-                tar.extractall(dest)
-
-    def get_python(self):
+    def get_python(self) -> None:
+        """Installs Python if not already installed."""
         # Determine Python executable path based on platform
         system = platform.system().lower()
         if system == "windows":
@@ -163,9 +85,9 @@ class RezInstaller:
                 "python3",
             )
 
-        if not self._should_install("python_version",
-                                    self.python_version) or os.path.exists(
-                python_exe):
+        if not self._should_install(
+            "python_version", self.python_version
+        ) or os.path.exists(python_exe):
             self.log.info(
                 "Python %s already found on disk or manifest, skipping installation.",
                 self.python_version,
@@ -180,11 +102,13 @@ class RezInstaller:
 
             # Resolve correct URL dynamically instead of hardcoding the date tag (e.g. 20240814)
             python_build_url = self._resolve_python_build_standalone_url(
-                self.python_version, target)
+                self.python_version, target
+            )
 
             temp_folder = tempfile.mkdtemp(prefix="python-")
-            python_archive = os.path.join(temp_folder, "python.tar." +
-                                          python_build_url.split(".")[-1])
+            python_archive = os.path.join(
+                temp_folder, "python.tar." + python_build_url.split(".")[-1]
+            )
 
             self.log.info("Downloading Python from %s", python_build_url)
             urllib.request.urlretrieve(python_build_url, python_archive)
@@ -192,11 +116,14 @@ class RezInstaller:
 
             self.log.info("Extracting Python to %s", self.python_folder)
 
-            self.extract_archive(Path(python_archive), Path(self.python_folder))
+            self._extract_archive(
+                Path(python_archive), Path(self.python_folder)
+            )
 
             extracted_folder = os.path.join(self.python_folder, "python")
-            target_folder = os.path.join(self.python_folder,
-                                         f"python-{self.python_version}")
+            target_folder = os.path.join(
+                self.python_folder, f"python-{self.python_version}"
+            )
             if os.path.exists(extracted_folder):
                 if os.path.exists(target_folder):
                     shutil.rmtree(target_folder)
@@ -210,7 +137,8 @@ class RezInstaller:
             self.log.exception(e)
             self.errors.append("python install failed")
 
-    def post_install(self):
+    def post_install(self) -> None:
+        """Cleanup temporary files directories created during installation."""
         if self.__garbage:
             for i in self.__garbage:
                 try:
@@ -223,7 +151,7 @@ class RezInstaller:
                 else:
                     self.log.info("removed tempfile %s", i)
 
-    def write_manifest(self, key: str = None, value: any = None):
+    def write_manifest(self, key: str = None, value: any = None) -> None:
         """Writes or updates the manifest file."""
         manifest = self.load_manifest() or {}
 
@@ -231,12 +159,14 @@ class RezInstaller:
             manifest[key] = value
         else:
             # Fallback to full write if no specific key provided
-            manifest.update({
-                "rez_version": self.rez_version,
-                "python_version": self.python_version,
-                "graphviz_version": self.graphviz_version,
-                "dependencies": self.dependencies,
-            })
+            manifest.update(
+                {
+                    "rez_version": self.rez_version,
+                    "python_version": self.python_version,
+                    "graphviz_version": self.graphviz_version,
+                    "dependencies": self.dependencies,
+                }
+            )
 
         try:
             # Load the full file content first, not just the bundle-specific part
@@ -254,15 +184,19 @@ class RezInstaller:
             with open(self.manifest_path, "w") as f:
                 json.dump(full_manifest_data, f, indent=4)
 
-            self.log.info("Manifest updated for %s: %s", self.bundle_version,
-                          key if key else "all")
+            self.log.info(
+                "Manifest updated for %s: %s",
+                self.bundle_version,
+                key if key else "all",
+            )
             # Update local cache
             self.installed = manifest
 
         except Exception as e:
             self.log.error("Failed to write manifest: %s", e)
 
-    def load_manifest(self):
+    def load_manifest(self) -> dict | None:
+        """Loads the manifest file for the current bundle version."""
         if not os.path.exists(self.manifest_path):
             return None
         try:
@@ -279,14 +213,14 @@ class RezInstaller:
         if self.installed is None:
             return False
         self.log.debug(
-            "Checking if requested configuration matches installed manifest.")
+            "Checking if requested configuration matches installed manifest."
+        )
         return (
-                self.installed.get("rez_version") == self.rez_version and
-                self.installed.get("python_version") == self.python_version and
-                self.installed.get(
-                    "graphviz_version") == self.graphviz_version and
-                set(self.installed.get("dependencies", [])) == set(
-            self.dependencies)
+            self.installed.get("rez_version") == self.rez_version
+            and self.installed.get("python_version") == self.python_version
+            and self.installed.get("graphviz_version") == self.graphviz_version
+            and set(self.installed.get("dependencies", []))
+            == set(self.dependencies)
         )
 
     def run(self):
@@ -300,13 +234,15 @@ class RezInstaller:
 
             if self.progress_callback:
                 self.progress_callback(20, "Getting Rez")
-            rez_zip = self.get_rez()
+            rez_zip = self.download_rez()
 
             if self.progress_callback:
                 self.progress_callback(40, "Installing Rez")
-            self.setup_rez(rez_zip)
-            if not self.installed.get(
-                    "rez_version") == self.rez_version and rez_zip is not None:
+            self.install_rez(rez_zip)
+            if (
+                not self.installed.get("rez_version") == self.rez_version
+                and rez_zip is not None
+            ):
                 raise RuntimeError("Rez installation failed")
 
             if self.progress_callback:
@@ -324,10 +260,11 @@ class RezInstaller:
             if self.progress_callback:
                 self.progress_callback(100, "Done")
         except Exception as e:
-            self.log.error(f"Installation failed: {e}")
+            self.log.exception("Installation failed: %s", e)
             raise
 
-    def get_rez(self):
+    def download_rez(self) -> str | None:
+        """Downloads Rez from GitHub and returns the path to the zip file."""
         if not self._should_install("rez_version", self.rez_version):
             self.log.info(
                 "Rez %s already downloaded/installed, skipping download.",
@@ -344,7 +281,8 @@ class RezInstaller:
         self.log.info("Downloaded Rez")
         return rez_temp
 
-    def setup_rez(self, archive: str):
+    def install_rez(self, archive: str) -> None:
+        """Installs Rez from the provided zip file."""
         if archive is None:
             return
 
@@ -377,11 +315,13 @@ class RezInstaller:
                     self.python_folder,
                     f"python-{self.python_version}",
                     "install",
-                    "lib"
+                    "lib",
                 )
                 env["DYLD_LIBRARY_PATH"] = actual_lib_path + (
-                    ":" + env.get("DYLD_LIBRARY_PATH", "") if env.get(
-                        "DYLD_LIBRARY_PATH") else "")
+                    ":" + env.get("DYLD_LIBRARY_PATH", "")
+                    if env.get("DYLD_LIBRARY_PATH")
+                    else ""
+                )
 
             result = subprocess.run(
                 cmd,
@@ -395,17 +335,23 @@ class RezInstaller:
                 self.log.warning(result.stderr)
 
             if system != "windows":
-                lib_path = os.path.join(os.path.dirname(self.python), "..",
-                                        "lib")
+                lib_path = os.path.join(
+                    os.path.dirname(self.python), "..", "lib"
+                )
                 if os.path.exists(lib_path):
                     files = os.listdir(lib_path)
-                    dylibs = [f for f in files if f.endswith(".dylib")]
+                    dylibs = [
+                        f for f in files if f.endswith((".dylib", ".so"))
+                    ]
                     if dylibs:
                         for dylib in dylibs:
-                            shutil.copy(os.path.join(lib_path, dylib),
-                                        os.path.join(self.rez_folder, "lib"))
+                            shutil.copy(
+                                os.path.join(lib_path, dylib),
+                                os.path.join(self.rez_folder, "lib"),
+                            )
                             self.log.info(
-                                f"Copied {dylib} to {self.rez_folder}")
+                                f"Copied {dylib} to {self.rez_folder}"
+                            )
 
         except subprocess.CalledProcessError as e:
             self.log.error(f"Command failed with exit code {e.returncode}")
@@ -418,7 +364,8 @@ class RezInstaller:
             self.log.info("Successfully installed Rez to %s", self.rez_folder)
             self.write_manifest("rez_version", self.rez_version)
 
-    def get_additional_packages(self):
+    def get_additional_packages(self) -> None:
+        """Installs additional dependencies using pip."""
         if not self._should_install("dependencies", self.dependencies):
             self.log.info("Dependencies already match manifest, skipping.")
             return
@@ -448,11 +395,13 @@ class RezInstaller:
                         self.python_folder,
                         f"python-{self.python_version}",
                         "install",
-                        "lib"
+                        "lib",
                     )
                     env["DYLD_LIBRARY_PATH"] = actual_lib_path + (
-                        ":" + env.get("DYLD_LIBRARY_PATH", "") if env.get(
-                            "DYLD_LIBRARY_PATH") else "")
+                        ":" + env.get("DYLD_LIBRARY_PATH", "")
+                        if env.get("DYLD_LIBRARY_PATH")
+                        else ""
+                    )
 
                 subprocess.run(
                     cmd,
@@ -466,18 +415,20 @@ class RezInstaller:
                 self.log.info("Successfully installed %s", package)
         self.write_manifest("dependencies", self.dependencies)
 
-    def get_graphviz(self):
+    def get_graphviz(self) -> str | None:
+        """Downloads Graphviz from GitHub and returns the path to the zip file."""
         if not self._should_install("graphviz_version", self.graphviz_version):
             self.log.info(
                 "Graphviz %s already installed, skipping.",
-                self.graphviz_version
+                self.graphviz_version,
             )
             return None
 
         system = platform.system().lower()
         if system != "windows":
             self.log.info(
-                "Skipping Graphviz installation on non-Windows platform.")
+                "Skipping Graphviz installation on non-Windows platform."
+            )
             self.write_manifest("graphviz_version", self.graphviz_version)
             return None
 
@@ -503,7 +454,8 @@ class RezInstaller:
 
         if not os.path.isdir(graphviz_bin_dir):
             self.log.error(
-                f"Graphviz bin directory not found: {graphviz_bin_dir}")
+                f"Graphviz bin directory not found: {graphviz_bin_dir}"
+            )
             return None
 
         file_names = os.listdir(graphviz_bin_dir)
@@ -531,3 +483,92 @@ class RezInstaller:
             return set(self.installed.get(key, [])) != set(requested_value)
 
         return self.installed.get(key) != requested_value
+
+    @staticmethod
+    def _get_platform_target() -> str:
+        """Get the python-build-standalone platform target string."""
+        system = platform.system().lower()
+        machine = platform.machine().lower()
+
+        # Normalize arch
+        arch_map = {
+            "amd64": "x86_64",
+            "x86_64": "x86_64",
+            "arm64": "aarch64",
+            "aarch64": "aarch64",
+        }
+        arch = arch_map.get(machine, machine)
+
+        # python-build-standalone naming convention
+        platform_map = {
+            ("windows", "x86_64"): "x86_64-pc-windows-msvc",
+            ("linux", "x86_64"): "x86_64-unknown-linux-gnu",
+            ("linux", "aarch64"): "aarch64-unknown-linux-gnu",
+            ("darwin", "x86_64"): "x86_64-apple-darwin",
+            ("darwin", "aarch64"): "aarch64-apple-darwin",
+        }
+
+        target = platform_map.get((system, arch))
+        if not target:
+            raise RuntimeError(f"Unsupported platform: {system} {arch}")
+        return target
+
+    @staticmethod
+    def _github_json(url: str) -> dict:
+        """Fetch JSON from GitHub API (no auth)."""
+        req = urllib.request.Request(
+            url,
+            headers={
+                "Accept": "application/vnd.github+json",
+                "User-Agent": "hbay-rez-manager",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+
+    def _resolve_python_build_standalone_url(
+        self, python_version: str, target: str
+    ) -> str:
+        """
+        Resolve a python-build-standalone asset URL dynamically.
+
+        We search GitHub releases and pick the first asset matching:
+          cpython-<version>+<tag>-<target>-install_only.tar.gz
+        """
+        wanted = re.compile(
+            rf"^cpython-{re.escape(python_version)}\+\d{{8}}-{re.escape(target)}-(pgo\+lto-full|pgo-full)\.tar\.(gz|zst)$"
+        )
+        self.log.info("%s", wanted)
+        "cpython-3.12.12+20251202-x86_64-pc-windows-msvc-pgo-full.tar.zst"
+        # GitHub API: list releases (newest first)
+        releases = self._github_json(
+            "https://api.github.com/repos/astral-sh/python-build-standalone/releases?per_page=20"
+        )
+        for rel in releases:
+            for asset in rel.get("assets", []):
+                name = asset.get("name", "")
+                self.log.debug(f"Checking asset: {name}")
+                if wanted.match(name):
+                    url = asset.get("browser_download_url")
+                    if url:
+                        return url
+
+        raise RuntimeError(
+            f"Could not find python-build-standalone asset for "
+            f"python={python_version}, target={target}. "
+            f"The requested version may not be published for this platform yet."
+        )
+
+    @staticmethod
+    def _extract_archive(archive_path: Path, dest: Path) -> None:
+        if archive_path.suffix == ".zst" or archive_path.name.endswith(
+            ".tar.zst"
+        ):
+            with open(archive_path, "rb") as fh:
+                dctx = zstd.ZstdDecompressor()
+                with dctx.stream_reader(fh) as reader:
+                    with tarfile.open(fileobj=reader, mode="r|") as tar:
+                        tar.extractall(dest)
+        else:
+            with tarfile.open(archive_path, "r:gz") as tar:
+                tar.extractall(dest)
