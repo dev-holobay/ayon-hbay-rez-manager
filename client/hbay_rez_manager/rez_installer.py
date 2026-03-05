@@ -107,17 +107,18 @@ class RezInstaller:
           cpython-<version>+<tag>-<target>-install_only.tar.gz
         """
         wanted = re.compile(
-            rf"^cpython-{re.escape(python_version)}\+\d{{8}}-{re.escape(target)}-pgo\+lto-full\.tar\.(gz|zst)$"
+            rf"^cpython-{re.escape(python_version)}\+\d{{8}}-{re.escape(target)}-(pgo\+lto-full|pgo-full)\.tar\.(gz|zst)$"
         )
-
+        self.log.info(f"{wanted}")
+        "cpython-3.12.12+20251202-x86_64-pc-windows-msvc-pgo-full.tar.zst"
         # GitHub API: list releases (newest first)
         releases = self._github_json(
             "https://api.github.com/repos/astral-sh/python-build-standalone/releases?per_page=20"
         )
-
         for rel in releases:
             for asset in rel.get("assets", []):
                 name = asset.get("name", "")
+                self.log.debug(f"Checking asset: {name}")
                 if wanted.match(name):
                     url = asset.get("browser_download_url")
                     if url:
@@ -150,7 +151,7 @@ class RezInstaller:
             python_exe = os.path.join(
                 self.python_folder,
                 f"python-{self.python_version}",
-                "python",
+                "install",
                 "python.exe",
             )
         else:
