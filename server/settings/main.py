@@ -8,6 +8,13 @@ class MultiplatformPath(BaseSettingsModel):
     linux: str = Field("", title="Linux")
     darwin: str = Field("", title="MacOS")
 
+def _config_type_enum():
+    return [
+        {"value": "config_file", "label": "Use Rez Config File"},
+        {"value": "config_web", "label": "Use Rez Config Json Field"},
+        {"value": "config_envvar", "label": "Use Envvar to point to Rez Config"},
+    ]
+
 class RezInstallOptions(BaseSettingsModel):
     rez_python_version: str = SettingsField(
         title="Python Version",
@@ -35,11 +42,28 @@ class RezInstallOptions(BaseSettingsModel):
 
 
 class RezConfigOptions(BaseSettingsModel):
-    rez_packages_path: MultiplatformPath = SettingsField(
-        default_factory=MultiplatformPath,
-        title="Rez Packages Path",
-        scope=["studio", "project", "site"],
-        description="Root directory where Rez packages are stored",
+    config_type: str = SettingsField(
+        "config_web",
+        title="Rez Config Type",
+        enum_resolver=_config_type_enum,
+        conditional_enum=True,
+        description="Choose between file-based config via the repo under /data/rezconfig.py or web-based config (define inline) or define a path to a file which will be set via REZ_CONFIG",
+    )
+    config_file: str = SettingsField(
+        "",
+        title="Rez config file from addon data is being used",
+        description="The rezconfig.py file is provided by the addon repository",
+    )
+    config_web: str = SettingsField(
+        "",
+        title="Rez Config JSON",
+        description="Define rez configuration as JSON. Example:\n{\n  \"packages_path\": [\"P:/pipe/rez/packages\"],\n  \"local_packages_path\": \"~/rez/packages\"\n}",
+        widget="textarea",
+    )
+    config_envvar: str = SettingsField(
+        default_factory=str,
+        title="Path pointing to file will be set to REZ_CONFIG_FILE",
+        description="This can expand variables like %localappdata%.",
     )
 
 

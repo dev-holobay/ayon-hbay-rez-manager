@@ -15,10 +15,11 @@ Requirements:
 - .env file with AYON_SERVER_URL and AYON_API_KEY
 
 Usage:
-    python bump_and_upload.py              # bump patch by default
-    python bump_and_upload.py --bump minor
-    python bump_and_upload.py --bump major
-    python bump_and_upload.py --bump patch
+    python release_helper.py                # bump patch by default
+    python release_helper.py --bump minor
+    python release_helper.py --bump major
+    python release_helper.py --bump patch
+    python release_helper.py --suffix hby   # add suffix: 1.8.5 -> 1.8.5+hby
 """
 
 import argparse
@@ -48,17 +49,35 @@ def setup_logging(debug=False):
 
 
 def parse_version(version_str):
-    """Parse semantic version string into (major, minor, patch)."""
-    match = re.match(r'^(\d+)\.(\d+)\.(\d+)', version_str)
+    """Parse semantic version string into (major, minor, patch, suffix)."""
+    # Match version with optional suffix: 1.8.5 or 1.8.5+hby
+    match = re.match(r'^(\d+)\.(\d+)\.(\d+)(?:\+(.+))?$', version_str)
     if not match:
         raise ValueError(f"Invalid version format: {version_str}")
-    return tuple(map(int, match.groups()))
+    major, minor, patch, suffix = match.groups()
+    return int(major), int(minor), int(patch), suffix or ""
 
 
-def bump_version(version_str, bump_type="patch"):
-    """Bump semantic version."""
-    major, minor, patch = parse_version(version_str)
+def bump_version(version_str, bump_type="patch", suffix=None):
+    """Bump semantic version or add/update suffix.
 
+    Args:
+        version_str: Current version string (e.g., "1.8.5" or "1.8.5+hby")
+        bump_type: Type of version bump (major/minor/patch)
+        suffix: If provided, adds/updates suffix instead of bumping version
+                Use empty string "" to remove suffix
+
+    Returns:
+        New version string
+    """
+    major, minor, patch, current_suffix = parse_version(version_str)
+
+    # If suffix is provided, just update the suffix without bumping
+    if suffix is not None:
+        base_version = f"{major}.{minor}.{patch}"
+        return f"{base_version}+{suffix}" if suffix else base_version
+
+    # Otherwise, bump the version (and remove suffix if present)
     if bump_type == "major":
         major += 1
         minor = 0
@@ -158,7 +177,12 @@ def main():
         "--bump",
         choices=["major", "minor", "patch"],
         default="patch",
-        help="Version bump type (default: patch)"
+        help="Version bump type (default: patch). Ignored if --suffix is provided."
+    )
+    parser.add_argument(
+        "--suffix",
+        type=str,
+        help="Add/update version suffix (e.g., 'hby', 'dev'). Creates version like 1.8.5+hby. Cannot be used with --dev-upload."
     )
     parser.add_argument(
         "--debug",
@@ -184,6 +208,11 @@ def main():
     args = parser.parse_args()
     log = setup_logging(args.debug)
 
+    # Validate arguments
+    if args.dev_upload and args.suffix:
+        log.error("Cannot use --suffix with --dev-upload")
+        return 1
+
     repo_root = Path.cwd()
     log.info(f"Repository: {repo_root}")
 
@@ -198,11 +227,17 @@ def main():
     new_version = current_version
     if not args.dev_upload:
         # Calculate new version
-        new_version = bump_version(current_version, args.bump)
-        log.info(f"New version: {new_version} ({args.bump} bump)")
+        if args.suffix is not None:
+            new_version = bump_version(current_version, args.bump, suffix=args.suffix)
+            suffix_desc = f"+{args.suffix}" if args.suffix else "removed"
+            log.info(f"New version: {new_version} (suffix: {suffix_desc})")
+        else:
+            new_version = bump_version(current_version, args.bump)
+            log.info(f"New version: {new_version} ({args.bump} bump)")
 
         # Confirm with user
-        response = input(f"\nBump version {current_version} → {new_version}? [y/N]: ")
+        action = f"add suffix +{args.suffix}" if args.suffix else f"{args.bump} bump"
+        response = input(f"\n{action.capitalize()}: {current_version} → {new_version}? [y/N]: ")
         if response.lower() != 'y':
             log.info("Aborted by user")
             return 0
@@ -229,33 +264,34 @@ def main():
             return 1
 
         # Git operations
-        log.info("\n=== Git operations ===")
-        try:
-            # Add files
-            for file_path in updated_files:
-                run_command(["git", "add", str(file_path)], log)
+        if not args.skip_push:
+            log.info("\n=== Git operations ===")
+            try:
+                # Add files
+                for file_path in updated_files:
+                    run_command(["git", "add", str(file_path)], log)
 
-            # Commit
-            commit_msg = f"Bump version to {new_version}"
-            run_command(["git", "commit", "-m", commit_msg], log)
-            log.info(f"✓ Committed: {commit_msg}")
+                # Commit
+                commit_msg = f"Bump version to {new_version}"
+                run_command(["git", "commit", "-m", commit_msg], log)
+                log.info(f"✓ Committed: {commit_msg}")
 
-            # Tag
-            tag_name = f"v{new_version}"
-            run_command(["git", "tag", "-a", tag_name, "-m", f"Version {new_version}"], log)
-            log.info(f"✓ Tagged: {tag_name}")
+                # Tag
+                tag_name = f"v{new_version}"
+                run_command(["git", "tag", "-a", tag_name, "-m", f"Version {new_version}"], log)
+                log.info(f"✓ Tagged: {tag_name}")
 
-            # Push
-            if not args.skip_push:
+                # Push
                 run_command(["git", "push"], log)
                 run_command(["git", "push", "--tags"], log)
                 log.info("✓ Pushed to remote")
-            else:
-                log.info("⊘ Skipped push (--skip-push)")
 
-        except subprocess.CalledProcessError as e:
-            log.error(f"Git operation failed: {e}")
-            return 1
+            except subprocess.CalledProcessError as e:
+                log.error(f"Git operation failed: {e}")
+                return 1
+        else:
+            log.info("\n⊘ Skipped all git operations (--skip-push)")
+            log.info("   Version files updated locally but not committed")
 
     # Create package
     log.info("\n=== Creating package ===")

@@ -8,6 +8,7 @@ from qtpy import QtCore
 from . import rez_installer
 from .version import __version__
 from .qt_helper import ProgressBarDialog, ProgressSignalWrapper
+from .rez_config_helper import manage_rez_config_from_settings
 
 ADDON_ROOT = os.path.dirname(os.path.abspath(__file__))
 
@@ -78,6 +79,11 @@ class RezManagerAddon(AYONAddon, ITrayAddon):
         self.log.info(
             f"using Rez {installer.rez_path_folder}, adding to PATH."
         )
+        # manage rez config
+        rez_config_path = manage_rez_config_from_settings(self.rez_settings.get("rez_config_options", {}))
+        if rez_config_path:
+            self.log.info(f"Rez Config: {rez_config_path}")
+            os.environ["REZ_CONFIG_FILE"] = rez_config_path
 
     def get_launch_hook_paths(self, app):
         return [
