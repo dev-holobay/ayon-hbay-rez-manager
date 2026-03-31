@@ -87,14 +87,11 @@ class RezInstaller:
                 self.python_folder,
                 "-Version",
                 self.python_version,
+                "-Source",
+                "https://api.nuget.org/v3/index.json"
             ]
             self.log.info(" ".join(cmd))
-            subprocess.run(
-                cmd,
-                shell=True,
-                check=True,
-                capture_output=True,
-            )
+            self._execute_command(" ".join(cmd))
         except Exception as e:
             self.log.exception(e)
             self.errors.append("python install failed")
@@ -252,12 +249,7 @@ class RezInstaller:
                 self.rez_folder,
             )
             self.log.debug(cmd)
-            subprocess.run(
-                cmd,
-                shell=True,
-                check=True,
-                capture_output=True,
-            )
+            self._execute_command(cmd)
 
         except Exception as e:
             self.log.exception(e)
@@ -277,12 +269,7 @@ class RezInstaller:
                     os.path.join(self.rez_folder, "Scripts", "pip.exe"),
                     package,
                 )
-                subprocess.run(
-                    cmd,
-                    shell=True,
-                    check=True,
-                    capture_output=True,
-                )
+                self._execute_command(cmd)
             except Exception as e:
                 self.log.exception(e)
             else:
@@ -332,3 +319,28 @@ class RezInstaller:
             return set(self.installed.get(key, [])) != set(requested_value)
 
         return self.installed.get(key) != requested_value
+
+    def _execute_command(self, command: str):
+        """Executes a command with the specified working directory."""
+        self.log.info("Executing command: %s", command)
+        result = subprocess.run(
+            command,
+            shell=True,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode != 0:
+            self.log.error(
+                f"Command failed with return code {result.returncode}")
+            self.log.error(f"STDOUT:\n{result.stdout}")
+            self.log.error(f"STDERR:\n{result.stderr}")
+            raise subprocess.CalledProcessError(
+                result.returncode, command, result.stdout, result.stderr
+            )
+        else:
+            if result.stdout:
+                self.log.info(f"STDOUT:\n{result.stdout}")
+            if result.stderr:
+                self.log.warning(f"STDERR:\n{result.stderr}")

@@ -5,7 +5,6 @@ from platformdirs import user_data_dir
 
 from qtpy import QtCore
 
-from . import rez_installer
 from .version import __version__
 from .qt_helper import ProgressBarDialog, ProgressSignalWrapper
 from .rez_config_helper import manage_rez_config_from_settings
@@ -37,6 +36,8 @@ class RezManagerAddon(AYONAddon, ITrayAddon):
         pass
 
     def tray_start(self) -> None:
+        # we dont want to import this at root level as it is ment for tray only
+        from . import rez_installer
         path = user_data_dir(appname="rez", appauthor=self.studio_code)
 
         # Check if Rez is installed, if not, install it

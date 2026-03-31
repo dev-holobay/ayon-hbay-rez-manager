@@ -8,7 +8,7 @@ from typing import Any
 DEFAULT_VALUES: dict[str, Any] = {
     "rez_python_version": "3.13.11",
     "rez_version": "3.3.0",
-    "rez_packages_path": {"windows": "P:/pipe/rez/p-ext;P:/pipe/rez/p-int"},
+    #"rez_packages_path": {"windows": "P:/pipe/rez/p-ext;P:/pipe/rez/p-int"},
     "graphviz_version": "14.1.1",
     "additional_dependencies_pip": '["PySide6==6.10.1", "Qt.py==1.4.8"]'
 }
@@ -18,7 +18,7 @@ DEFAULT_VALUES: dict[str, Any] = {
 def test_rez_installation():
     """Test the full Rez installation process using default settings."""
     logging.basicConfig(level=logging.INFO)
-    path = user_data_dir(appname="rez", appauthor="holobay")
+    path = user_data_dir(appname="rez", appauthor="holobay-test")
 
     # Parse dependencies from default settings
     dependencies = DEFAULT_VALUES["additional_dependencies_pip"]
@@ -37,7 +37,7 @@ def test_rez_installation():
     )
 
     # We run the installer. If it crashes, the test fails.
-    installer.install_rez()
+    installer.run()
 
     # Basic assertions to ensure manifest was created
     assert installer.check_if_installed() is True
