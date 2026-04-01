@@ -1,13 +1,16 @@
 import json
 import os
+import platform
+import subprocess
 from ayon_core.addon import AYONAddon, ITrayAddon
 from platformdirs import user_data_dir
 
-from qtpy import QtCore
+from qtpy import QtCore, QtWidgets, QtGui
 
 from .version import __version__
 from .qt_helper import ProgressBarDialog, ProgressSignalWrapper
 from .rez_config_helper import manage_rez_config_from_settings
+from .rez_apps import REZ_APPS
 
 ADDON_ROOT = os.path.dirname(os.path.abspath(__file__))
 
@@ -30,7 +33,70 @@ class RezManagerAddon(AYONAddon, ITrayAddon):
         pass
 
     def tray_menu(self, tray_menu) -> None:
-        pass
+        """Add Rez applications to the tray menu."""
+        if not REZ_APPS:
+            return
+
+        # Create a submenu for Rez applications
+        rez_menu = QtWidgets.QMenu("Rez Applications", tray_menu)
+
+        for app_name, app_config in REZ_APPS.items():
+            action = QtWidgets.QAction(app_name, rez_menu)
+
+            # Set icon if it exists
+            icon_path = app_config.get("icon")
+            if icon_path and os.path.exists(icon_path):
+                action.setIcon(QtGui.QIcon(icon_path))
+
+            # Connect to launch function
+            rez_request = app_config.get("rez-request", [])
+            rez_executable = app_config.get("rez-executable", "").get(platform.system().lower())
+            command = ["rez-env"] + rez_request + ["--", rez_executable,]
+            action.triggered.connect(
+                lambda checked=False, cmd=command, name=app_name: self._execute_command(cmd)
+            )
+
+            rez_menu.addAction(action)
+
+        tray_menu.addMenu(rez_menu)
+
+    def _execute_command(self, command):
+        """Executes a command the logging output is logged back into the main log"""
+        self.log.info("Executing command: %s", command)
+        try:
+            # Launch process without blocking
+            if os.name == 'nt':  # Windows
+                process = subprocess.Popen(
+                    command,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS,
+                    close_fds=True,
+                    text=True
+                )
+            else:  # Unix-like
+                process = subprocess.Popen(
+                    command,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    start_new_session=True,
+                    close_fds=True,
+                    text=True
+                )
+
+            # Log output in a non-blocking way using a thread
+            def log_output():
+                stdout, stderr = process.communicate()
+                if stdout:
+                    self.log.debug(f"STDOUT:\n{stdout}")
+                if stderr:
+                    self.log.debug(f"STDERR:\n{stderr}")
+
+            import threading
+            threading.Thread(target=log_output, daemon=True).start()
+
+        except Exception as e:
+            self.log.error(f"Failed to execute command: {e}")
 
     def tray_init(self) -> None:
         pass
