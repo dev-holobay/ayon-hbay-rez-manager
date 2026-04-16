@@ -1,6 +1,6 @@
 """Configurations for Rez applications that can be launched
 from the tray menu.
-"""
+"""  # noqa: D205
 
 import os
 
