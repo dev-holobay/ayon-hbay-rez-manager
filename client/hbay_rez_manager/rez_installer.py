@@ -274,7 +274,7 @@ class RezInstaller:
             return None
 
         # Get default temp folder
-        temp_folder = Path(tempfile.mkdtemp(prefix="re   z-"))
+        temp_folder = Path(tempfile.mkdtemp(prefix="rez-"))
 
         # Check for whitespaces in resolved path
         if ' ' in str(temp_folder.resolve()):
@@ -300,7 +300,7 @@ class RezInstaller:
         if archive is None:
             return
 
-        temp_folder = tempfile.mkdtemp(prefix="rez-   temp-")
+        temp_folder = tempfile.mkdtemp(prefix="rez-temp-")
         # Check for whitespaces in resolved path
         if ' ' in str(Path(temp_folder).resolve()):
             if os.name == 'nt':
