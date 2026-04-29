@@ -1,5 +1,7 @@
 import json
 import logging
+from pathlib import Path
+
 import pytest
 from platformdirs import user_data_dir
 from hbay_rez_manager.rez_installer import RezInstaller
@@ -8,7 +10,7 @@ from typing import Any
 DEFAULT_VALUES: dict[str, Any] = {
     "rez_python_version": "3.13.11",
     "rez_version": "3.3.0",
-    #"rez_packages_path": {"windows": "P:/pipe/rez/p-ext;P:/pipe/rez/p-int"},
+    # "rez_packages_path": {"windows": "P:/pipe/rez/p-ext;P:/pipe/rez/p-int"},
     "graphviz_version": "14.1.1",
     "additional_dependencies_pip": '["PySide6==6.10.1", "Qt.py==1.4.8"]'
 }
@@ -18,8 +20,8 @@ DEFAULT_VALUES: dict[str, Any] = {
 def test_rez_installation():
     """Test the full Rez installation process using default settings."""
     logging.basicConfig(level=logging.INFO)
-    path = user_data_dir(appname="rez", appauthor="holobay-test")
-
+    path = user_data_dir(appname="rez", appauthor="holobay-test2")
+    # path = Path.home() / ".rez"
     # Parse dependencies from default settings
     dependencies = DEFAULT_VALUES["additional_dependencies_pip"]
     if isinstance(dependencies, str):

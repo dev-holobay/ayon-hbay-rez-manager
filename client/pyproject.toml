@@ -1,0 +1,6 @@
+[project]
+name="hbay_rez_manager"
+description="Hbay Rez addon."
+
+[tool.poetry.dependencies]
+zstandard = "0.25.0"
