@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
+import time
 import urllib
 import urllib.request
 import zipfile
@@ -514,8 +515,8 @@ class RezInstaller:
         return target
 
     @staticmethod
-    def _github_json(url: str) -> dict:
-        """Fetch JSON from GitHub API (no auth)."""
+    def _github_json(url: str, max_retries: int = 5) -> dict:
+        """Fetch JSON from GitHub API (no auth) with retry logic."""
         req = urllib.request.Request(
             url,
             headers={
@@ -523,8 +524,34 @@ class RezInstaller:
                 "User-Agent": "hbay-rez-manager",
             },
         )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+
+        # Transient errors that should be retried
+        retryable_codes = {502, 503, 504}  # Bad Gateway, Service Unavailable, Gateway Timeout
+
+        for attempt in range(max_retries):
+            try:
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    return json.loads(resp.read().decode("utf-8"))
+            except urllib.error.HTTPError as e:
+                if e.code in retryable_codes and attempt < max_retries - 1:
+                    # Exponential backoff: 2, 4, 8, 16, 32 seconds
+                    wait_time = 2 ** (attempt + 1)
+                    logging.getLogger("RezInstaller").warning(
+                        f"GitHub API returned {e.code}, retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})"
+                    )
+                    time.sleep(wait_time)
+                else:
+                    raise
+            except urllib.error.URLError as e:
+                # Network errors (timeout, connection refused, etc.)
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** (attempt + 1)
+                    logging.getLogger("RezInstaller").warning(
+                        f"Network error: {e.reason}, retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})"
+                    )
+                    time.sleep(wait_time)
+                else:
+                    raise
 
     def _resolve_python_build_standalone_url(
         self, python_version: str, target: str
@@ -539,7 +566,7 @@ class RezInstaller:
             rf"^cpython-{re.escape(python_version)}\+\d{{8}}-{re.escape(target)}-(pgo\+lto-full|pgo-full)\.tar\.(gz|zst)$"
         )
         self.log.info("%s", wanted)
-        "cpython-3.12.12+20251202-x86_64-pc-windows-msvc-pgo-full.tar.zst"
+        # "cpython-3.12.12+20251202-x86_64-pc-windows-msvc-pgo-full.tar.zst"
         # GitHub API: list releases (newest first)
         releases = self._github_json(
             "https://api.github.com/repos/astral-sh/python-build-standalone/releases?per_page=20"

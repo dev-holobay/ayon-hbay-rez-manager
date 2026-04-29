@@ -23,6 +23,7 @@ def test_rez_installation():
     path = user_data_dir(appname="rez", appauthor="holobay-test2")
     # path = Path.home() / ".rez"
     # Parse dependencies from default settings
+    path = r"C:\TEMP\test mit leerzeichen"
     dependencies = DEFAULT_VALUES["additional_dependencies_pip"]
     if isinstance(dependencies, str):
         try:
