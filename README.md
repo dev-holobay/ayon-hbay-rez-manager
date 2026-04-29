@@ -32,7 +32,6 @@ https://gitlab.com/api/v4/projects/4207231/packages/generic/graphviz-releases/{0
 The prelaunch hook pre_set_rez_config propagates the rez_config_options.
 
 - REZ_PACKAGES_PATH
-- more to come
 
 ![config example](images/config_example.jpg)
 
@@ -47,6 +46,5 @@ Thanks to [BigRoy](https://github.com/BigRoy) for the hook that really helped a 
 
 - add support for other platforms
 - add option to set env var into PATH for the current user, in windows settings
-- add support for all rez_config options
 - add ui in tray to rezify python from nuget
 - add ui in tray to manage pip installations for the existing python variants

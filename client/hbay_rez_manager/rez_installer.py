@@ -572,3 +572,27 @@ class RezInstaller:
         else:
             with tarfile.open(archive_path, "r:gz") as tar:
                 tar.extractall(dest)
+    def _execute_command(self, command: str):
+        """Executes a command with the specified working directory."""
+        self.log.info("Executing command: %s", command)
+        result = subprocess.run(
+            command,
+            shell=True,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode != 0:
+            self.log.error(
+                f"Command failed with return code {result.returncode}")
+            self.log.error(f"STDOUT:\n{result.stdout}")
+            self.log.error(f"STDERR:\n{result.stderr}")
+            raise subprocess.CalledProcessError(
+                result.returncode, command, result.stdout, result.stderr
+            )
+        else:
+            if result.stdout:
+                self.log.info(f"STDOUT:\n{result.stdout}")
+            if result.stderr:
+                self.log.warning(f"STDERR:\n{result.stderr}")
