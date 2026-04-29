@@ -273,14 +273,27 @@ class RezInstaller:
             )
             return None
 
-        temp_folder = tempfile.mkdtemp(prefix="python-")
-        rez_temp = os.path.join(temp_folder, f"{self.rez_version}.zip")
+        # Get default temp folder
+        temp_folder = Path(tempfile.mkdtemp(prefix="rez-"))
+
+        # Check for whitespaces in resolved path
+        if ' ' in str(temp_folder.resolve()):
+            if os.name == 'nt':
+                temp_folder = Path(
+                    os.environ.get('PROGRAMDATA', 'C:\\ProgramData')) / 'rez_temp'
+            else:
+                temp_folder = Path('/tmp/rez_temp')
+
+            temp_folder.mkdir(parents=True, exist_ok=True)
+            self.log.info("Using space-free temp location: %s", temp_folder)
+
+        rez_temp = temp_folder / f"{self.rez_version}.zip"
         self.log.info("Downloading Rez to temporary path")
-        urllib.request.urlretrieve(REZ_URL.format(self.rez_version), rez_temp)
-        self.__garbage.append(rez_temp)
-        self.log.debug(rez_temp)
+        urllib.request.urlretrieve(REZ_URL.format(self.rez_version), str(rez_temp))
+        self.__garbage.append(str(rez_temp))
+        self.log.debug(str(rez_temp))
         self.log.info("Downloaded Rez")
-        return rez_temp
+        return str(rez_temp)
 
     def install_rez(self, archive: str) -> None:
         """Installs Rez from the provided zip file."""
