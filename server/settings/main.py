@@ -22,6 +22,12 @@ class RezInstallOptions(BaseSettingsModel):
         default_factory=str,
     )
 
+    astral_python_tag: str = SettingsField(
+        title="Astral Python Tag",
+        description="This speeds up install as we now can construct the full url to python, otherwise we fallback to a search in the latest releases",
+        default_factory=str,
+    )
+
     rez_version: str = SettingsField(
         title="Rez Pip Version",
         description="The Version that is being used from pip to setup rez",
@@ -82,6 +88,7 @@ class RezManagerSettings(BaseSettingsModel):
 DEFAULT_VALUES: dict[str, Any] = {
     "rez_install_options": {
         "rez_python_version": "3.13.11",
+        "astral_python_tag": "20260127",
         "rez_version": "3.3.0",
         "graphviz_version": "14.1.1",
         "additional_dependencies_pip": '["PySide6==6.10.1", "Qt.py==1.4.8"]', },

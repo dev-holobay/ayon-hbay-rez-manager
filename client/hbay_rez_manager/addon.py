@@ -117,6 +117,7 @@ class RezManagerAddon(AYONAddon, ITrayAddon):
                                                json.loads(
                                                    self.rez_install_settings.get(
                                                        "additional_dependencies_pip")),
+                                               astral_python_tag=self.rez_install_settings.get("astral_python_tag"),
                                                logger=self.log)
         if not installer.check_if_installed():
             # quick check if all versions already line up

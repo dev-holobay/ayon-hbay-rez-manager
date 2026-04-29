@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import platform
-import re
 import shutil
 import subprocess
 import tarfile
@@ -16,7 +15,7 @@ from pathlib import Path
 
 import zstandard as zstd
 
-from .constants import GRAPHVIZ_URL, REZ_URL
+from .constants import GRAPHVIZ_URL, REZ_URL, ASTRAL_PYTHON_DOWNLOAD_ROOT, ASTRAL_PYTHON_TAGS
 
 
 class RezInstaller:
@@ -28,6 +27,7 @@ class RezInstaller:
         python_version: str,
         graphviz_version: str,
         dependencies: list,
+        astral_python_tag: str = "",
         logger: logging.Logger = None,
     ):
         self.log = logger or logging.getLogger(self.__class__.__name__)
@@ -36,6 +36,7 @@ class RezInstaller:
         self.python_version = python_version
         self.graphviz_version = graphviz_version
         self.dependencies = dependencies
+        self.astral_python_tag = astral_python_tag
         self.log.info(
             "Initializing RezInstaller with settings: %s", self.__dict__
         )
@@ -576,39 +577,6 @@ class RezInstaller:
                 else:
                     raise
 
-    def _resolve_python_build_standalone_url(
-        self, python_version: str, target: str
-    ) -> str:
-        """
-        Resolve a python-build-standalone asset URL dynamically.
-
-        We search GitHub releases and pick the first asset matching:
-          cpython-<version>+<tag>-<target>-install_only.tar.gz
-        """
-        wanted = re.compile(
-            rf"^cpython-{re.escape(python_version)}\+\d{{8}}-{re.escape(target)}-(pgo\+lto-full|pgo-full)\.tar\.(gz|zst)$"
-        )
-        self.log.info("%s", wanted)
-        # "cpython-3.12.12+20251202-x86_64-pc-windows-msvc-pgo-full.tar.zst"
-        # GitHub API: list releases (newest first)
-        releases = self._github_json(
-            "https://api.github.com/repos/astral-sh/python-build-standalone/releases?per_page=20"
-        )
-        for rel in releases:
-            for asset in rel.get("assets", []):
-                name = asset.get("name", "")
-                self.log.debug(f"Checking asset: {name}")
-                if wanted.match(name):
-                    url = asset.get("browser_download_url")
-                    if url:
-                        return url
-
-        raise RuntimeError(
-            f"Could not find python-build-standalone asset for "
-            f"python={python_version}, target={target}. "
-            f"The requested version may not be published for this platform yet."
-        )
-
     @staticmethod
     def _extract_archive(archive_path: Path, dest: Path) -> None:
         if archive_path.suffix == ".zst" or archive_path.name.endswith(
@@ -622,6 +590,7 @@ class RezInstaller:
         else:
             with tarfile.open(archive_path, "r:gz") as tar:
                 tar.extractall(dest)
+
     def _execute_command(self, command: str):
         """Executes a command with the specified working directory."""
         self.log.info("Executing command: %s", command)
@@ -646,3 +615,80 @@ class RezInstaller:
                 self.log.info(f"STDOUT:\n{result.stdout}")
             if result.stderr:
                 self.log.warning(f"STDERR:\n{result.stderr}")
+
+    def _resolve_python_build_standalone_url(
+        self, python_version: str, target: str
+    ) -> str:
+        """
+        Resolve a python-build-standalone asset URL.
+
+        1. Use the user provided tag if available.
+        2. If that misses, fall back to scanning release tags via the GitHub API
+           newest-first
+        """
+        if self.astral_python_tag:
+            self.log.debug("Trying provided tag: %s", self.astral_python_tag)
+            url = self._construct_direct_url(python_version, target, self.astral_python_tag)
+            if url:
+                self.log.info(
+                    "Found Python %s at provided release tag %s: %s",
+                    python_version, self.astral_python_tag, url,
+                )
+                return url
+
+        tags = self._github_json(ASTRAL_PYTHON_TAGS)
+        self.log.debug("Found %d releases", len(tags))
+        for _tag in tags:
+            self.log.debug("Checking release: %s", _tag)
+            tag = _tag.get("name")
+            url = self._construct_direct_url(python_version, target, tag)
+            if url:
+                self.log.info(
+                    "Found Python %s at release tag %s: %s",
+                    python_version, tag, url,
+                )
+                return url
+
+        raise RuntimeError(
+            f"Could not find python-build-standalone asset for "
+            f"python={python_version}, target={target} in the last "
+            f"{len(tags)} releases."
+        )
+
+    def _construct_direct_url(
+        self, python_version: str, target: str, tag: str
+    ) -> str | None:
+        """
+        Construct and HEAD-verify a direct download URL for a given release tag.
+        Tries pgo+lto-full first (preferred), then pgo-full, across .zst and .gz.
+        Returns the URL if the asset exists, None otherwise.
+        """
+        if target == "x86_64-pc-windows-msvc":
+            flavor = "pgo-full"
+        else:
+            flavor = "pgo+lto-full"
+        for ext in ("tar.zst", "tar.gz"):
+            filename = (
+                f"cpython-{python_version}+{tag}-{target}-{flavor}.{ext}"
+            )
+            url = (
+                f"{ASTRAL_PYTHON_DOWNLOAD_ROOT}/{tag}/{filename}"
+            )
+            try:
+                req = urllib.request.Request(
+                    url,
+                    method="HEAD",
+                    headers={"User-Agent": "hbay-rez-manager"},
+                )
+                with urllib.request.urlopen(req, timeout=10):
+                    self.log.debug("Verified asset exists: %s", url)
+                    return url
+            except urllib.error.HTTPError as e:
+                if e.code == 404:
+                    self.log.debug("Asset not found (404): %s", filename)
+                    continue
+                raise
+            except Exception as e:
+                self.log.debug("HEAD check failed for %s: %s", url, e)
+                continue
+        return None
