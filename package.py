@@ -6,7 +6,7 @@ name = "hbay_rez_manager"
 title = "Holobay Rez Manager"
 
 # Required: Valid semantic version (https://semver.org/)
-version = "0.2.2"
+version = "0.2.3"
 
 # Name of client code directory imported in AYON launcher
 # - do not specify if there is no client code
