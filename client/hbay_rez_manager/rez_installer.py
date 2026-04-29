@@ -274,7 +274,7 @@ class RezInstaller:
             return None
 
         # Get default temp folder
-        temp_folder = Path(tempfile.mkdtemp(prefix="rez-"))
+        temp_folder = Path(tempfile.mkdtemp(prefix="re   z-"))
 
         # Check for whitespaces in resolved path
         if ' ' in str(temp_folder.resolve()):
@@ -300,7 +300,17 @@ class RezInstaller:
         if archive is None:
             return
 
-        temp_folder = tempfile.mkdtemp(prefix="rez-temp-")
+        temp_folder = tempfile.mkdtemp(prefix="rez-   temp-")
+        # Check for whitespaces in resolved path
+        if ' ' in str(Path(temp_folder).resolve()):
+            if os.name == 'nt':
+                temp_folder = Path(
+                    os.environ.get('PROGRAMDATA', 'C:\\ProgramData')) / 'rez_temp_extract'
+            else:
+                temp_folder = Path('/tmp/rez_temp_extract')
+
+            temp_folder.mkdir(parents=True, exist_ok=True)
+            self.log.info("Using space-free temp location: %s", temp_folder)
         with zipfile.ZipFile(archive, "r") as zip_ref:
             zip_ref.extractall(temp_folder)
         self.__garbage.append(temp_folder)
