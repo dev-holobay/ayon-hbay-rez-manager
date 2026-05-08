@@ -73,6 +73,29 @@ class RezConfigOptions(BaseSettingsModel):
     )
 
 
+class RezStandaloneAppConfig(BaseSettingsModel):
+    app_name: str = SettingsField(
+        "",
+        title="Application Name",
+        description="Display name for the application in the tray menu",
+    )
+    rez_request: list[str] = SettingsField(
+        default_factory=list,
+        title="Rez Request",
+        description="List of rez packages to request (e.g., ['usd_nvidia'])",
+    )
+    rez_executable: MultiplatformPath = SettingsField(
+        default_factory=MultiplatformPath,
+        title="Rez Executable",
+        description="Executable name for each platform",
+    )
+    icon_filename: str = SettingsField(
+        "",
+        title="Icon Filename",
+        description="Icon filename (must exist in the addon's icons folder)",
+    )
+
+
 class RezManagerSettings(BaseSettingsModel):
     enabled: bool = SettingsField(True)
     rez_install_options: RezInstallOptions = SettingsField(
@@ -83,6 +106,11 @@ class RezManagerSettings(BaseSettingsModel):
         title="Rez Config Options",
         default_factory=RezConfigOptions,
     )
+    rez_standalone_apps: list[RezStandaloneAppConfig] = SettingsField(
+        title="Rez Standalone Applications",
+        default_factory=list,
+        description="Configure standalone applications that can be launched via rez-env",
+    )
 
 
 DEFAULT_VALUES: dict[str, Any] = {
@@ -91,8 +119,51 @@ DEFAULT_VALUES: dict[str, Any] = {
         "astral_python_tag": "20260127",
         "rez_version": "3.3.0",
         "graphviz_version": "14.1.1",
-        "additional_dependencies_pip": '["PySide6==6.10.1", "Qt.py==1.4.8"]', },
-
+        "additional_dependencies_pip": '["PySide6==6.10.1", "Qt.py==1.4.8"]',
+    },
     "rez_config_options": {
-        "rez_packages_path":{"windows": "P:/pipe/rez/p-ext;P:/pipe/rez/p-int"}},
+        "rez_packages_path": {"windows": "P:/pipe/rez/p-ext;P:/pipe/rez/p-int"}
+    },
+    "rez_standalone_apps": [
+        {
+            "app_name": "USD View",
+            "rez_request": ["usd_nvidia"],
+            "rez_executable": {
+                "windows": "usdview_gui.bat",
+                "linux": "usdview_gui",
+                "darwin": "usdview_gui",
+            },
+            "icon_filename": "usd.png",
+        },
+        {
+            "app_name": "Open Rv",
+            "rez_request": ["openrv"],
+            "rez_executable": {
+                "windows": "rv.exe",
+                "linux": "rv",
+                "darwin": "rv",
+            },
+            "icon_filename": "rv.png",
+        },
+        {
+            "app_name": "QuiltiX",
+            "rez_request": ["QuiltiX"],
+            "rez_executable": {
+                "windows": "QuiltiX.bat",
+                "linux": "",
+                "darwin": "",
+            },
+            "icon_filename": "quiltix.png",
+        },
+        {
+            "app_name": "F3d",
+            "rez_request": ["f3d"],
+            "rez_executable": {
+                "windows": "f3d",
+                "linux": "",
+                "darwin": "",
+            },
+            "icon_filename": "f3d.png",
+        },
+    ],
 }

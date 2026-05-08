@@ -10,7 +10,6 @@ from qtpy import QtCore, QtWidgets, QtGui
 from .version import __version__
 from .qt_helper import ProgressBarDialog, ProgressSignalWrapper
 from .rez_config_helper import manage_rez_config_from_settings
-from .rez_apps import REZ_APPS
 
 ADDON_ROOT = os.path.dirname(os.path.abspath(__file__))
 
@@ -34,24 +33,37 @@ class RezManagerAddon(AYONAddon, ITrayAddon):
 
     def tray_menu(self, tray_menu) -> None:
         """Add Rez applications to the tray menu."""
-        if not REZ_APPS:
+        rez_apps = self.rez_settings.get("rez_standalone_apps", [])
+        if not rez_apps:
             return
 
         # Create a submenu for Rez applications
         rez_menu = QtWidgets.QMenu("Rez Applications", tray_menu)
 
-        for app_name, app_config in REZ_APPS.items():
+        current_platform = platform.system().lower()
+
+        for app_config in rez_apps:
+            app_name = app_config.get("app_name", "")
+            if not app_name:
+                continue
+
             action = QtWidgets.QAction(app_name, rez_menu)
 
             # Set icon if it exists
-            icon_path = app_config.get("icon")
-            if icon_path and os.path.exists(icon_path):
-                action.setIcon(QtGui.QIcon(icon_path))
+            icon_filename = app_config.get("icon_filename")
+            if icon_filename:
+                icon_path = os.path.join(ADDON_ROOT, "icons", icon_filename)
+                if os.path.exists(icon_path):
+                    action.setIcon(QtGui.QIcon(icon_path))
 
             # Connect to launch function
-            rez_request = app_config.get("rez-request", [])
-            rez_executable = app_config.get("rez-executable", "").get(platform.system().lower())
-            command = ["rez-env"] + rez_request + ["--", rez_executable,]
+            rez_request = app_config.get("rez_request", [])
+            rez_executable = app_config.get("rez_executable", {}).get(current_platform, "")
+
+            if not rez_executable:
+                continue
+
+            command = ["rez-env"] + rez_request + ["--", rez_executable]
             action.triggered.connect(
                 lambda checked=False, cmd=command, name=app_name: self._execute_command(cmd)
             )
