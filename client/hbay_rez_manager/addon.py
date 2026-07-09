@@ -63,7 +63,7 @@ class RezManagerAddon(AYONAddon, ITrayAddon):
             if not rez_executable:
                 continue
 
-            command = ["rez-env"] + rez_request + ["--", rez_executable]
+            command = ["rez-env"] + rez_request + ["--"] + rez_executable.split(" ")
             action.triggered.connect(
                 lambda checked=False, cmd=command, name=app_name: self._execute_command(cmd)
             )
